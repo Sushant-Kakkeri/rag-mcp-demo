@@ -1,10 +1,10 @@
 streamlit
 openai
-langchain==0.1.9
-langchain-openai==0.0.8
-langchain-community==0.0.24
-langchain-text-splitters==0.0.1
-langchain-core==0.1.27
+langchain
+langchain-openai
+langchain-community
+langchain-text-splitters
+langchain-core
 chromadb==0.4.22
 pypdf
 python-dotenv
