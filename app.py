@@ -1,4 +1,23 @@
-# app.py
+# ===========================================
+# Author:      Sushant Kakkeri
+# Title:       Senior Enterprise Software
+#              Engineer
+# Application: MCP Research Assistant
+# Created:     April 2026
+# Copyright:   © 2026 Sushant Kakkeri
+#              All Rights Reserved
+# ===========================================
+
+# ===========================================
+# Author:      Sushant Kakkeri
+# Title:       Senior Enterprise Software
+#              Engineer
+# Application: Smart RAG + MCP Assistant
+# Created:     April 2026
+# Copyright:   © 2026 Sushant Kakkeri
+#              All Rights Reserved
+# ===========================================
+
 import streamlit as st
 from dotenv import load_dotenv
 from rag_engine import RAGEngine
@@ -50,6 +69,21 @@ st.markdown("""
     font-weight: bold;
     font-size: 14px;
 }
+.author-bar {
+    background: linear-gradient(
+        90deg, #1a1a2e, #16213e);
+    padding: 8px 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+.footer-bar {
+    text-align: center;
+    padding: 15px;
+    background: linear-gradient(
+        90deg, #1a1a2e, #16213e);
+    border-radius: 10px;
+    margin-top: 20px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,12 +121,12 @@ if openai_key:
 
     if uploaded_files:
         for uploaded_file in uploaded_files:
-            file_key = (f"loaded_"
-                f"{uploaded_file.name}")
+            file_key = (
+                f"loaded_{uploaded_file.name}")
             if file_key not in st.session_state:
                 with st.spinner(
-                    f"📚 Indexing "
-                    f"{uploaded_file.name}..."):
+                        f"📚 Indexing "
+                        f"{uploaded_file.name}..."):
                     success, info = (
                         st.session_state
                         .rag_engine
@@ -114,9 +148,11 @@ if openai_key:
     if (st.session_state.get("rag_engine") and
             st.session_state.rag_engine
             .has_documents()):
-        st.sidebar.success("📄 RAG: Documents loaded")
+        st.sidebar.success(
+            "📄 RAG: Documents loaded")
     else:
-        st.sidebar.warning("📄 RAG: No documents yet")
+        st.sidebar.warning(
+            "📄 RAG: No documents yet")
 
     st.sidebar.success("🔧 MCP: Tools ready")
     st.sidebar.info(
@@ -134,10 +170,56 @@ if openai_key:
         st.session_state.message_log = []
         st.rerun()
 
+    # ─────────────────────────────
+    # SIDEBAR AUTHOR SIGNATURE
+    # ─────────────────────────────
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+<div style='text-align: center;
+    padding: 10px;'>
+    <div style='color: #e94560;
+        font-weight: bold;
+        font-size: 13px;'>
+        👨‍💻 Sushant Kakkeri
+    </div>
+    <div style='color: gray;
+        font-size: 11px;
+        margin-top: 4px;'>
+        Senior Enterprise Software Engineer
+    </div>
+    <div style='color: gray;
+        font-size: 10px;
+        margin-top: 2px;'>
+        © 2026 All Rights Reserved
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 # ─────────────────────────────
 # MAIN INTERFACE
 # ─────────────────────────────
 st.title("🧠 Smart RAG + MCP Assistant")
+
+# ─────────────────────────────
+# AUTHOR BAR UNDER TITLE
+# ─────────────────────────────
+st.markdown("""
+<div class='author-bar'>
+    <span style='color: #e94560;
+        font-weight: bold;
+        font-size: 13px;'>
+        👨‍💻 Built by Sushant Kakkeri
+    </span>
+    <span style='color: #aaa;
+        font-size: 12px;'>
+        &nbsp;|&nbsp;
+        Senior Enterprise Software Engineer
+        &nbsp;|&nbsp;
+        © 2026 All Rights Reserved
+    </span>
+</div>
+""", unsafe_allow_html=True)
+
 st.caption(
     "AI that intelligently decides when to "
     "search your documents vs use live tools")
@@ -150,7 +232,7 @@ with st.expander(
     col1.markdown("""
     ### 📄 Uses RAG when:
     - You ask about uploaded documents
-    - Questions about stored policies
+    - Questions about stored content
     - "What does the document say about..."
     - Finding specific content in files
     """)
@@ -193,22 +275,22 @@ else:
                 tool = msg.get("tool_used", "")
                 if tool == "RAG":
                     st.markdown(
-                        '<span class="routing-badge" '
-                        'style="background:#e3f2fd;'
+                        '<span class="routing-badge"'
+                        ' style="background:#e3f2fd;'
                         'color:#1565c0">'
                         '📄 Used RAG</span>',
                         unsafe_allow_html=True)
                 elif tool == "MCP":
                     st.markdown(
-                        '<span class="routing-badge" '
-                        'style="background:#e8f5e9;'
+                        '<span class="routing-badge"'
+                        ' style="background:#e8f5e9;'
                         'color:#2e7d32">'
                         '🔧 Used MCP</span>',
                         unsafe_allow_html=True)
                 elif tool == "BOTH":
                     st.markdown(
-                        '<span class="routing-badge" '
-                        'style="background:#fff3e0;'
+                        '<span class="routing-badge"'
+                        ' style="background:#fff3e0;'
                         'color:#e65100">'
                         '🔄 Used RAG + MCP</span>',
                         unsafe_allow_html=True)
@@ -272,7 +354,8 @@ else:
                 "assistant", avatar="🧠"):
             with st.spinner(
                     "🤔 Thinking and routing..."):
-                result = (st.session_state
+                result = (
+                    st.session_state
                     .router
                     .route_and_respond(
                         user_input,
@@ -283,22 +366,22 @@ else:
             tool = result["tool_used"]
             if tool == "RAG":
                 st.markdown(
-                    '<span class="routing-badge" '
-                    'style="background:#e3f2fd;'
+                    '<span class="routing-badge"'
+                    ' style="background:#e3f2fd;'
                     'color:#1565c0">'
                     '📄 Used RAG</span>',
                     unsafe_allow_html=True)
             elif tool == "MCP":
                 st.markdown(
-                    '<span class="routing-badge" '
-                    'style="background:#e8f5e9;'
+                    '<span class="routing-badge"'
+                    ' style="background:#e8f5e9;'
                     'color:#2e7d32">'
                     '🔧 Used MCP</span>',
                     unsafe_allow_html=True)
             elif tool == "BOTH":
                 st.markdown(
-                    '<span class="routing-badge" '
-                    'style="background:#fff3e0;'
+                    '<span class="routing-badge"'
+                    ' style="background:#fff3e0;'
                     'color:#e65100">'
                     '🔄 Used RAG + MCP</span>',
                     unsafe_allow_html=True)
@@ -329,3 +412,35 @@ else:
             "role": "assistant",
             "content": result["answer"]
         })
+
+# ─────────────────────────────
+# FOOTER
+# ─────────────────────────────
+st.markdown("---")
+st.markdown("""
+<div class='footer-bar'>
+    <div style='color: #e94560;
+        font-weight: bold;
+        font-size: 14px;'>
+        🧠 Smart RAG + MCP Assistant
+    </div>
+    <div style='color: #aaa;
+        font-size: 12px;
+        margin-top: 5px;'>
+        Built by
+        <b style='color: white;'>
+            Sushant Kakkeri
+        </b>
+        &nbsp;|&nbsp;
+        Senior Enterprise Software Engineer
+    </div>
+    <div style='color: gray;
+        font-size: 11px;
+        margin-top: 4px;'>
+        Powered by OpenAI GPT-4o +
+        LangChain + FAISS + Streamlit
+        &nbsp;|&nbsp;
+        © 2026 All Rights Reserved
+    </div>
+</div>
+""", unsafe_allow_html=True)
