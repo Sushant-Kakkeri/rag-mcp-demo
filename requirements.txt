@@ -5,7 +5,7 @@ langchain-openai==0.1.23
 langchain-community==0.2.16
 langchain-text-splitters==0.2.4
 langchain-core==0.2.38
-chromadb==0.4.22
+chromadb==0.6.3
 pypdf
 python-dotenv
 requests
