@@ -1,14 +1,44 @@
+# ===========================================
 # router.py
+# ===========================================
+# Smart Router for RAG + MCP Demo App
+#
+# The Router decides:
+# - RAG only  → question about documents
+# - MCP only  → live data/general questions
+# - BOTH      → explicitly needs both
+#
+# KEY FIX:
+# Previously: Had RAG context + used MCP tool
+#             = always showed BOTH (WRONG!)
+#
+# Now:        Only shows BOTH when question
+#             EXPLICITLY asks about document
+#             AND live data together!
+#
+# New routing logic:
+# 1. Check if question is about documents
+# 2. Check if question needs live data
+# 3. Only use BOTH if BOTH are clearly needed
+# ===========================================
+
 from openai import OpenAI
 from mcp_tools import MCP_TOOLS, execute_tool
 import json
 
+
+# ===========================================
+# IMPROVED SYSTEM PROMPT
+# ===========================================
+# Much stricter rules about when to use
+# each mode. Fixes the over-triggering BOTH!
+# ===========================================
 SYSTEM_PROMPT = """You are an intelligent
 assistant with two powerful capabilities:
 
 1. 📄 RAG (Document Search): Search through
-uploaded documents to find specific
-information from those files.
+   uploaded documents to find specific
+   information from those files.
 
 2. 🔧 MCP Tools: Access live tools:
    - web_search: Current news and events
@@ -16,36 +46,72 @@ information from those files.
    - wikipedia_search: General knowledge
    - get_current_datetime: Current time/date
 
-STRICT DECISION RULES:
+════════════════════════════════════════════
+STRICT ROUTING RULES - FOLLOW EXACTLY!
+════════════════════════════════════════════
 
-Use RAG ONLY when:
-- User asks about uploaded documents
-- Question contains words like:
-  'document', 'PDF', 'uploaded file',
-  'what does it say', 'according to'
-- Question is clearly about stored content
+USE RAG ONLY when:
+✅ User DIRECTLY asks about uploaded document
+✅ User says "the document", "the PDF",
+   "the guide", "the file", "the report"
+✅ User says "what does it say about..."
+✅ User says "according to the document..."
+✅ User asks to summarize the document
+✅ Question is clearly about stored content
 
-Use MCP ONLY when:
-- User needs live/current information
-- Weather questions
-- General knowledge questions  
-- Recent news or events
-- No mention of documents at all
+Examples:
+✅ "What does the document say about Lambda?"
+✅ "According to the PDF, what are prerequisites?"
+✅ "Summarize the uploaded guide"
+✅ "What services are mentioned in the document?"
 
-Use BOTH when:
-- Question contains AND, ALSO, PLUS,
-  ADDITIONALLY, AS WELL AS
-- User asks about document AND 
-  something live at the same time
-- Example: "What does document say 
-  about X AND find latest news about X"
-- Any question combining document 
-  content with live information
+────────────────────────────────────────────
 
-CRITICAL RULE:
-If user uses the word AND between a 
-document question and a live question
-ALWAYS use BOTH tools together!
+USE MCP ONLY when:
+✅ Weather questions of ANY kind
+✅ General knowledge questions
+✅ Current news or events
+✅ Questions about real world facts
+✅ No mention of documents at all
+✅ Question could be answered without documents
+
+Examples:
+✅ "What is the weather in San Antonio?"
+✅ "What is NASA's next mission?"
+✅ "What time is it?"
+✅ "Tell me about quantum computing"
+✅ "Latest news about SpaceX"
+✅ "What is the temperature in Bulverde TX?"
+
+CRITICAL: Even if a document is uploaded,
+use MCP ONLY for weather, news, and general
+knowledge questions that are NOT about
+the document content!
+
+────────────────────────────────────────────
+
+USE BOTH only when:
+✅ Question EXPLICITLY asks about document
+   AND live data IN THE SAME QUESTION
+✅ User uses connecting words like AND, ALSO,
+   PLUS, AS WELL AS between a document
+   question and a live question
+
+Examples:
+✅ "What does document say about S3 AND
+   what is current AWS pricing?"
+✅ "Summarize the PDF AND find latest
+   news about AWS Lambda"
+✅ "What does the guide say about ECS
+   AND show me current ECS pricing?"
+
+NOT BOTH:
+❌ Weather questions (always MCP only!)
+❌ NASA/space questions not in document
+❌ Any question not mentioning document
+❌ General questions even if doc uploaded
+
+════════════════════════════════════════════
 
 ALWAYS start your response with:
 🧠 **Routing Decision:** Using [RAG/MCP/BOTH]
@@ -55,19 +121,44 @@ Then provide your complete answer."""
 
 
 class SmartRouter:
-    def __init__(self, openai_key: str,
+    """
+    Smart Router that decides how to answer.
+
+    Routes to:
+    - RAG:  document questions
+    - MCP:  live data questions
+    - BOTH: explicitly needs both
+    """
+
+    def __init__(self,
+                 openai_key: str,
                  rag_engine):
+        """
+        Initialize Smart Router.
+
+        Args:
+            openai_key:  OpenAI API key
+            rag_engine:  RAG engine instance
+        """
         self.client = OpenAI(
             api_key=openai_key)
         self.rag_engine = rag_engine
 
     def route_and_respond(
-            self, query: str,
+            self,
+            query: str,
             chat_history: list) -> dict:
         """
-        Intelligently route query to
-        RAG, MCP or both
+        Route query to RAG, MCP or both.
+
+        Args:
+            query:        User question
+            chat_history: Past messages
+
+        Returns:
+            Dict with answer and metadata
         """
+        # Initialize result dictionary
         result = {
             "answer": "",
             "tool_used": "",
@@ -77,73 +168,177 @@ class SmartRouter:
         }
 
         # ─────────────────────────────
-        # Step 1 - Check for BOTH keywords
+        # STEP 1: Detect if question is
+        # about documents specifically
         # ─────────────────────────────
-        both_keywords = [
-            " and ", " also ", " plus ",
-            " additionally ", " as well as ",
-            " combine ", " along with ",
-            " together with "
+
+        # Keywords that suggest document question
+        doc_keywords = [
+            "document", "pdf", "file",
+            "guide", "report", "uploaded",
+            "what does it say",
+            "according to",
+            "in the document",
+            "from the document",
+            "the guide says",
+            "based on the",
+            "summarize the",
+            "summary of the"
         ]
+
+        # Keywords that suggest live data
+        # regardless of document content!
+        live_keywords = [
+            "weather", "temperature",
+            "forecast", "humidity",
+            "wind", "rain", "sunny",
+            "news", "latest", "current",
+            "today", "right now",
+            "stock price", "price of",
+            "what time", "date today"
+        ]
+
+        # Keywords that explicitly connect
+        # document AND live questions
+        both_keywords = [
+            " and find ",
+            " and also ",
+            " and search ",
+            " and get ",
+            " as well as ",
+            " along with ",
+            " together with ",
+            " plus find ",
+            " also find ",
+            " additionally find "
+        ]
+
         query_lower = query.lower()
-        likely_both = any(
+
+        # Check what type of question this is
+        is_doc_question = any(
             kw in query_lower
-            for kw in both_keywords)
+            for kw in doc_keywords)
+
+        is_live_question = any(
+            kw in query_lower
+            for kw in live_keywords)
+
+        # Only BOTH if EXPLICITLY asks for both
+        # Must have doc keyword AND connecting
+        # word AND live data request
+        is_explicit_both = (
+            is_doc_question and
+            any(kw in query_lower
+                for kw in both_keywords)
+        )
 
         # ─────────────────────────────
-        # Step 2 - Check RAG documents
+        # STEP 2: Get RAG context
+        # Only search docs if question
+        # is actually about documents!
         # ─────────────────────────────
         rag_context = None
-        if self.rag_engine.has_documents():
+
+        # Only search documents if:
+        # 1. Documents are loaded
+        # 2. Question is about document
+        #    OR explicitly needs both
+        if (self.rag_engine.has_documents()
+                and (is_doc_question
+                     or is_explicit_both)):
             rag_context = (
                 self.rag_engine.search(query))
 
         # ─────────────────────────────
-        # Step 3 - Build messages
+        # STEP 3: Build smart messages
+        # Tell AI what context we have
+        # and what routing to use
         # ─────────────────────────────
         messages = [
             {"role": "system",
              "content": SYSTEM_PROMPT}
         ]
 
-        # Add recent chat history
+        # Add recent conversation history
+        # Last 6 messages = 3 exchanges
         for msg in chat_history[-6:]:
             messages.append(msg)
 
-        # Build user content based on context
-        if rag_context and likely_both:
+        # ─────────────────────────────
+        # Build user content based on
+        # what type of question this is
+        # ─────────────────────────────
+
+        if is_explicit_both and rag_context:
+            # Explicit BOTH question with docs
             user_content = (
                 f"USER QUESTION: {query}\n\n"
-                f"IMPORTANT: This question "
-                f"uses AND/ALSO — use BOTH "
-                f"RAG and MCP tools!\n\n"
+                f"⚠️ This question asks about "
+                f"BOTH document content AND "
+                f"live information. "
+                f"Use BOTH mode!\n\n"
                 f"DOCUMENT CONTENT FOUND:\n"
                 f"{rag_context}\n\n"
                 f"Also use MCP tools for "
                 f"the live information part.")
 
-        elif rag_context:
+        elif is_doc_question and rag_context:
+            # Document question with context
             user_content = (
                 f"USER QUESTION: {query}\n\n"
+                f"This is a DOCUMENT question. "
+                f"Use RAG mode.\n\n"
                 f"RELEVANT DOCUMENT CONTENT:\n"
                 f"{rag_context}\n\n"
-                f"Use document content if "
-                f"relevant, or MCP tools "
-                f"if live data is needed.")
+                f"Answer using the document "
+                f"content above. Do NOT use "
+                f"MCP tools unless the answer "
+                f"is NOT in the document.")
 
-        else:
+        elif is_doc_question and (
+                not self.rag_engine
+                .has_documents()):
+            # Document question but no docs
             user_content = (
                 f"USER QUESTION: {query}\n\n"
-                f"No documents uploaded yet. "
-                f"Use MCP tools to answer.")
+                f"User is asking about a "
+                f"document but NO documents "
+                f"are uploaded yet!\n\n"
+                f"Tell user to upload a PDF "
+                f"first. Use MCP tools to "
+                f"answer what you can.")
 
+        elif is_live_question:
+            # Live data question - MCP only!
+            # Even if documents are uploaded!
+            user_content = (
+                f"USER QUESTION: {query}\n\n"
+                f"This is a LIVE DATA question "
+                f"(weather/news/current info). "
+                f"Use MCP mode ONLY!\n\n"
+                f"Do NOT use RAG even if "
+                f"documents are available. "
+                f"Use appropriate MCP tool.")
+
+        else:
+            # General question - MCP only
+            user_content = (
+                f"USER QUESTION: {query}\n\n"
+                f"This is a general question. "
+                f"Use MCP mode.\n\n"
+                f"Use appropriate MCP tools "
+                f"to find the answer.")
+
+        # Add user message
         messages.append({
             "role": "user",
             "content": user_content
         })
 
         # ─────────────────────────────
-        # Step 4 - Call OpenAI with tools
+        # STEP 4: Call OpenAI with tools
+        # AI decides which MCP tool to use
         # ─────────────────────────────
         response = self.client.chat\
             .completions.create(
@@ -158,24 +353,32 @@ class SmartRouter:
             response.choices[0].message)
 
         # ─────────────────────────────
-        # Step 5 - Handle MCP tool calls
+        # STEP 5: Handle tool calls
+        # KEY FIX IS HERE!
+        # Only mark as BOTH if explicitly
+        # asked for both!
         # ─────────────────────────────
         if response_message.tool_calls:
             tool_results = []
             tools_used = []
 
+            # Execute each tool AI chose
             for tool_call in (
                     response_message.tool_calls):
                 tool_name = (
                     tool_call.function.name)
                 tool_args = json.loads(
-                    tool_call.function.arguments)
+                    tool_call.function
+                    .arguments)
 
-                # Execute the tool
+                # Run the tool
                 tool_result = execute_tool(
                     tool_name, tool_args)
+
+                # Store results
                 tool_results.append({
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id":
+                        tool_call.id,
                     "role": "tool",
                     "content": tool_result
                 })
@@ -183,47 +386,64 @@ class SmartRouter:
                 result["mcp_result"] = (
                     tool_result)
 
-            # Determine RAG + MCP or MCP only
-            if rag_context and (
-                    likely_both or
-                    len(tools_used) > 0):
+            # ─────────────────────────────
+            # THE KEY FIX!
+            # Only use BOTH if EXPLICITLY
+            # asked for both in the question!
+            # Not just because doc exists!
+            # ─────────────────────────────
+            if is_explicit_both and rag_context:
+                # Truly needs both!
                 result["tool_used"] = "BOTH"
+                result["routing_reason"] = (
+                    f"Question explicitly asks "
+                    f"about document AND live "
+                    f"data. Used: "
+                    f"{', '.join(tools_used)}")
             else:
+                # MCP only - even if doc exists!
                 result["tool_used"] = "MCP"
+                result["routing_reason"] = (
+                    f"Live data question. "
+                    f"Used MCP tools: "
+                    f"{', '.join(tools_used)}")
 
-            result["routing_reason"] = (
-                f"Used MCP tools: "
-                f"{', '.join(tools_used)}")
-
-            # Get final response
+            # Add AI decision to messages
             messages.append(response_message)
             messages.extend(tool_results)
 
-            # Add RAG context reminder
-            # for BOTH responses
+            # For BOTH mode combine sources
             if result["tool_used"] == "BOTH":
                 messages.append({
                     "role": "user",
                     "content": (
-                        "Now combine the document "
-                        "information AND the tool "
-                        "results into one complete "
-                        "answer. Show both sources "
-                        "clearly.")
+                        "Now combine the "
+                        "document information "
+                        "AND the tool results "
+                        "into one complete "
+                        "answer. Clearly show "
+                        "both sources.")
                 })
 
-            final_response = self.client.chat\
+            # Get final answer
+            final_response = (
+                self.client.chat
                 .completions.create(
                     model="gpt-4o",
                     messages=messages,
                     temperature=0.3
-                )
+                ))
+
             result["answer"] = (
-                final_response.choices[0]
+                final_response
+                .choices[0]
                 .message.content)
 
         else:
-            # Pure RAG response
+            # ─────────────────────────────
+            # No tool calls = RAG answer
+            # AI answered from document!
+            # ─────────────────────────────
             result["tool_used"] = "RAG"
             result["routing_reason"] = (
                 "Found answer in "
