@@ -2,19 +2,10 @@
 # Author:      Sushant Kakkeri
 # Title:       Senior Enterprise Software
 #              Engineer
-# Application: MCP Research Assistant
+# Application: Smart RAG + MCP Assistant
 # Created:     April 2026
 # Copyright:   © 2026 Sushant Kakkeri
 #              All Rights Reserved
-# ===========================================
-
-# ===========================================
-# rag_engine.py
-# ===========================================
-# RAG Engine - now using FAISS!
-# Replaced ChromaDB which breaks on
-# Python 3.14 due to opentelemetry.
-# FAISS is simpler and works everywhere!
 # ===========================================
 
 from langchain_text_splitters import (
@@ -31,39 +22,31 @@ import os
 class RAGEngine:
     """
     RAG Engine using FAISS vector store.
-    FAISS = Facebook AI Similarity Search
-    Much simpler than ChromaDB!
-    Works on Python 3.14! ✅
-    Works on Streamlit Cloud! ✅
+    Uses pypdf - works on Streamlit Cloud!
+    Includes chunk visualization support.
     """
 
     def __init__(self, openai_key: str):
-        """Initialize RAG Engine."""
         self.openai_key = openai_key
-
-        # FAISS vector store
-        # None until PDF is uploaded
         self.vectorstore = None
-
-        # OpenAI embeddings
-        # Converts text to numbers
         self.embeddings = OpenAIEmbeddings(
             api_key=openai_key)
-
-        # Track stats
         self.doc_count = 0
         self.loaded_files = []
+        # Store chunks for visualization
+        self.all_chunks = []
 
     def load_pdf(self,
                  uploaded_file) -> tuple:
         """
         Load and index a PDF file.
+        Stores chunks for visualization.
 
         Returns:
-            (True, chunks) or (False, error)
+            (True, chunk_count) or
+            (False, error_message)
         """
         tmp_path = None
-
         try:
             # Save to temp file
             with tempfile.NamedTemporaryFile(
@@ -100,16 +83,31 @@ class RAGEngine:
             chunks = splitter.split_documents(
                 documents)
 
+            # Store chunks for visualization!
+            # This is what the chunk inspector
+            # uses to display the chunks
+            for chunk in chunks:
+                self.all_chunks.append({
+                    "content": (
+                        chunk.page_content),
+                    "page": (
+                        chunk.metadata.get(
+                            "page", "?")),
+                    "source": (
+                        chunk.metadata.get(
+                            "source",
+                            uploaded_file.name)),
+                    "length": len(
+                        chunk.page_content)
+                })
+
             # Store in FAISS
-            # Much simpler than ChromaDB!
             if self.vectorstore is None:
-                # First PDF - create FAISS index
                 self.vectorstore = (
                     FAISS.from_documents(
                         chunks,
                         self.embeddings))
             else:
-                # More PDFs - merge into existing
                 new_store = (
                     FAISS.from_documents(
                         chunks,
@@ -117,7 +115,6 @@ class RAGEngine:
                 self.vectorstore.merge_from(
                     new_store)
 
-            # Track stats
             self.doc_count += len(documents)
             self.loaded_files.append(
                 uploaded_file.name)
@@ -142,17 +139,14 @@ class RAGEngine:
     def search(self,
                query: str,
                k: int = 4) -> str:
-        """Search documents."""
+        """Search documents for content."""
         if self.vectorstore is None:
             return None
-
         try:
             docs = self.vectorstore\
                 .similarity_search(query, k=k)
-
             if not docs:
                 return None
-
             context = ""
             for i, doc in enumerate(docs):
                 page = doc.metadata.get(
@@ -166,24 +160,58 @@ class RAGEngine:
                     f"{doc.page_content}\n\n"
                     f"{'─' * 30}\n\n")
             return context
-
         except Exception:
             return None
 
+    def get_chunks_for_display(self) -> list:
+        """
+        Returns all stored chunks for
+        visualization in the UI.
+
+        Each chunk has:
+        - content: the actual text
+        - page: page number in PDF
+        - source: filename
+        - length: character count
+        """
+        return self.all_chunks
+
+    def get_chunk_stats(self) -> dict:
+        """
+        Returns statistics about chunks
+        for display in the UI.
+        """
+        if not self.all_chunks:
+            return {}
+
+        lengths = [
+            c['length']
+            for c in self.all_chunks]
+
+        return {
+            "total": len(self.all_chunks),
+            "avg_length": (
+                sum(lengths) // len(lengths)),
+            "max_length": max(lengths),
+            "min_length": min(lengths),
+            "total_chars": sum(lengths)
+        }
+
     def has_documents(self) -> bool:
-        """Check if documents loaded."""
+        """Check if documents are loaded."""
         return self.vectorstore is not None
 
     def get_doc_count(self) -> int:
-        """Return page count."""
+        """Return number of pages loaded."""
         return self.doc_count
 
     def get_loaded_files(self) -> list:
-        """Return loaded filenames."""
+        """Return list of loaded filenames."""
         return self.loaded_files
 
     def clear_documents(self):
-        """Clear all documents."""
+        """Clear all loaded documents."""
         self.vectorstore = None
+        self.all_chunks = []
         self.doc_count = 0
         self.loaded_files = []
