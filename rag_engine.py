@@ -1,11 +1,8 @@
 # ===========================================
 # Author:      Sushant Kakkeri
-# Title:       Senior Enterprise Software
-#              Engineer
+# Title:       Senior System Architect
 # Application: Smart RAG + MCP Assistant
 # Created:     April 2026
-# Copyright:   © 2026 Sushant Kakkeri
-#              All Rights Reserved
 # ===========================================
 
 from langchain_text_splitters import (
@@ -17,6 +14,7 @@ from langchain_community.document_loaders import (
     PyPDFLoader)
 import tempfile
 import os
+import pandas as pd
 
 
 class RAGEngine:
@@ -24,6 +22,7 @@ class RAGEngine:
     RAG Engine using FAISS vector store.
     Uses pypdf - works on Streamlit Cloud!
     Includes chunk visualization support.
+    Includes dataframe/table export support.
     """
 
     def __init__(self, openai_key: str):
@@ -40,7 +39,8 @@ class RAGEngine:
                  uploaded_file) -> tuple:
         """
         Load and index a PDF file.
-        Stores chunks for visualization.
+        Stores chunks for visualization
+        and table display.
 
         Returns:
             (True, chunk_count) or
@@ -83,11 +83,13 @@ class RAGEngine:
             chunks = splitter.split_documents(
                 documents)
 
-            # Store chunks for visualization!
-            # This is what the chunk inspector
-            # uses to display the chunks
-            for chunk in chunks:
+            # Store chunks for visualization
+            # and table display
+            for i, chunk in enumerate(chunks):
                 self.all_chunks.append({
+                    "chunk_id": (
+                        len(self.all_chunks)
+                        + 1),
                     "content": (
                         chunk.page_content),
                     "page": (
@@ -96,9 +98,13 @@ class RAGEngine:
                     "source": (
                         chunk.metadata.get(
                             "source",
-                            uploaded_file.name)),
+                            uploaded_file
+                            .name)),
                     "length": len(
-                        chunk.page_content)
+                        chunk.page_content),
+                    "word_count": len(
+                        chunk.page_content
+                        .split())
                 })
 
             # Store in FAISS
@@ -165,16 +171,48 @@ class RAGEngine:
 
     def get_chunks_for_display(self) -> list:
         """
-        Returns all stored chunks for
+        Returns all stored chunks as
+        a list of dictionaries for
         visualization in the UI.
 
         Each chunk has:
+        - chunk_id: sequential number
         - content: the actual text
         - page: page number in PDF
         - source: filename
         - length: character count
+        - word_count: word count
         """
         return self.all_chunks
+
+    def get_chunks_as_dataframe(self):
+        """
+        Returns chunks as a pandas DataFrame
+        for table display and CSV export.
+
+        Columns:
+        - Chunk #
+        - Source File
+        - Page Number
+        - Word Count
+        - Character Count
+        - Content Preview
+        - Full Content
+        """
+        if not self.all_chunks:
+            return pd.DataFrame()
+
+        return pd.DataFrame([{
+            "Chunk #": chunk["chunk_id"],
+            "Source File": chunk["source"],
+            "Page": chunk["page"],
+            "Words": chunk["word_count"],
+            "Characters": chunk["length"],
+            "Preview": (
+                chunk["content"][:120]
+                + "..."),
+            "Full Content": chunk["content"]
+        } for chunk in self.all_chunks])
 
     def get_chunk_stats(self) -> dict:
         """
@@ -187,6 +225,9 @@ class RAGEngine:
         lengths = [
             c['length']
             for c in self.all_chunks]
+        words = [
+            c['word_count']
+            for c in self.all_chunks]
 
         return {
             "total": len(self.all_chunks),
@@ -194,8 +235,30 @@ class RAGEngine:
                 sum(lengths) // len(lengths)),
             "max_length": max(lengths),
             "min_length": min(lengths),
-            "total_chars": sum(lengths)
+            "total_chars": sum(lengths),
+            "total_words": sum(words),
+            "avg_words": (
+                sum(words) // len(words))
         }
+
+    def search_chunks_by_keyword(
+            self, keyword: str) -> list:
+        """
+        Search chunks by keyword for
+        the table filter feature.
+
+        Returns filtered list of chunks
+        containing the keyword.
+        """
+        if not keyword:
+            return self.all_chunks
+
+        keyword_lower = keyword.lower()
+        return [
+            c for c in self.all_chunks
+            if keyword_lower
+            in c["content"].lower()
+        ]
 
     def has_documents(self) -> bool:
         """Check if documents are loaded."""

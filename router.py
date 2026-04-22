@@ -1,7 +1,6 @@
 # ===========================================
 # Author:      Sushant Kakkeri
-# Title:       Senior Enterprise Software
-#              Engineer
+# Title:       Senior System Architect
 # Application: MCP Research Assistant
 # Created:     April 2026
 # Copyright:   © 2026 Sushant Kakkeri

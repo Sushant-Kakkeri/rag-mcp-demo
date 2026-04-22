@@ -1,11 +1,8 @@
 # ===========================================
 # Author:      Sushant Kakkeri
-# Title:       Senior Enterprise Software
-#              Engineer
+# Title:       Senior System Architect
 # Application: Smart RAG + MCP Assistant
 # Created:     April 2026
-# Copyright:   © 2026 Sushant Kakkeri
-#              All Rights Reserved
 # ===========================================
 
 import streamlit as st
@@ -31,42 +28,12 @@ st.set_page_config(
 # ─────────────────────────────
 st.markdown("""
 <style>
-.rag-box {
-    background: #e8f4f8;
-    border-left: 4px solid #2196F3;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 5px 0;
-}
-.mcp-box {
-    background: #e8f8e8;
-    border-left: 4px solid #4CAF50;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 5px 0;
-}
-.both-box {
-    background: #fff3e0;
-    border-left: 4px solid #FF9800;
-    padding: 10px;
-    border-radius: 5px;
-    margin: 5px 0;
-}
 .routing-badge {
     display: inline-block;
     padding: 3px 10px;
     border-radius: 12px;
     font-weight: bold;
     font-size: 14px;
-}
-.chunk-box {
-    background: #f8f9ff;
-    border-left: 3px solid #9C27B0;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 12px;
-    margin: 4px 0;
 }
 .author-bar {
     background: linear-gradient(
@@ -83,15 +50,52 @@ st.markdown("""
     border-radius: 10px;
     margin-top: 20px;
 }
-.stat-box {
+.stat-card {
     background: white;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 10px;
+    padding: 15px;
     text-align: center;
+}
+.chunk-preview {
+    background: #f8f9ff;
+    border-left: 3px solid #9C27B0;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────
+# ROUTING BADGE HELPER
+# ─────────────────────────────
+def show_badge(tool):
+    """Show colored routing badge."""
+    if tool == "RAG":
+        st.markdown(
+            '<span class="routing-badge"'
+            ' style="background:#e3f2fd;'
+            'color:#1565c0">'
+            '📄 Used RAG</span>',
+            unsafe_allow_html=True)
+    elif tool == "MCP":
+        st.markdown(
+            '<span class="routing-badge"'
+            ' style="background:#e8f5e9;'
+            'color:#2e7d32">'
+            '🔧 Used MCP</span>',
+            unsafe_allow_html=True)
+    elif tool == "BOTH":
+        st.markdown(
+            '<span class="routing-badge"'
+            ' style="background:#fff3e0;'
+            'color:#e65100">'
+            '🔄 Used RAG + MCP</span>',
+            unsafe_allow_html=True)
+
 
 # ─────────────────────────────
 # SIDEBAR
@@ -128,8 +132,10 @@ if openai_key:
     if uploaded_files:
         for uploaded_file in uploaded_files:
             file_key = (
-                "loaded_" + uploaded_file.name)
-            if file_key not in st.session_state:
+                "loaded_"
+                + uploaded_file.name)
+            if file_key not in (
+                    st.session_state):
                 with st.spinner(
                         "📚 Indexing "
                         + uploaded_file.name
@@ -137,7 +143,8 @@ if openai_key:
                     success, info = (
                         st.session_state
                         .rag_engine
-                        .load_pdf(uploaded_file))
+                        .load_pdf(
+                            uploaded_file))
                     if success:
                         st.session_state[
                             file_key] = True
@@ -162,11 +169,10 @@ if openai_key:
         st.sidebar.success(
             "📄 RAG: Documents loaded")
 
-        # ─────────────────────────────
-        # CHUNK STATS IN SIDEBAR
-        # ─────────────────────────────
-        stats = (st.session_state.rag_engine
-                 .get_chunk_stats())
+        # Chunk stats in sidebar
+        stats = (
+            st.session_state.rag_engine
+            .get_chunk_stats())
         if stats:
             st.sidebar.markdown("---")
             st.sidebar.subheader(
@@ -179,9 +185,8 @@ if openai_key:
                 str(stats["avg_length"])
                 + " chars")
             st.sidebar.metric(
-                "Total Characters",
-                str(stats["total_chars"]))
-
+                "Total Words Indexed",
+                stats["total_words"])
     else:
         st.sidebar.warning(
             "📄 RAG: No documents yet")
@@ -213,6 +218,11 @@ if openai_key:
         👨‍💻 Sushant Kakkeri
     </div>
     <div style='color: gray;
+        font-size: 11px;
+        margin-top: 4px;'>
+        Senior Enterprise Software Engineer
+    </div>
+    <div style='color: gray;
         font-size: 10px;
         margin-top: 2px;'>
         © 2026 All Rights Reserved
@@ -220,15 +230,18 @@ if openai_key:
 </div>
 """, unsafe_allow_html=True)
 
+
 # ─────────────────────────────
 # MAIN INTERFACE
 # ─────────────────────────────
 st.title("🧠 Smart RAG + MCP Assistant")
-st.caption(
-    "AI that intelligently decides when to "
-    "search your documents vs use live tools")
 
-# How it works expander
+st.caption(
+    "AI that intelligently decides when "
+    "to search your documents vs use "
+    "live tools")
+
+# How it works
 with st.expander(
         "💡 How does the AI decide? "
         "Click to learn more"):
@@ -236,8 +249,7 @@ with st.expander(
     col1.markdown("""
     ### 📄 Uses RAG when:
     - You ask about uploaded documents
-    - Questions about stored content
-    - "What does the document say about..."
+    - "What does the document say..."
     - Finding specific content in files
     """)
     col2.markdown("""
@@ -245,13 +257,11 @@ with st.expander(
     - Needs live/current information
     - Weather questions
     - Recent news or events
-    - General knowledge lookup
     """)
     col3.markdown("""
     ### 🔄 Uses BOTH when:
     - Needs document info + live data
     - Find in docs AND search web
-    - Complex multi-source questions
     """)
 
 st.markdown("---")
@@ -260,17 +270,18 @@ st.markdown("---")
 # TABS
 # ─────────────────────────────
 if openai_key:
-    tab1, tab2 = st.tabs([
+    tab1, tab2, tab3 = st.tabs([
         "💬 Chat Assistant",
-        "🔬 Chunk Inspector"
+        "🔬 Chunk Inspector",
+        "📋 Chunk Table"
     ])
 
-    # ═════════════════════════════
+    # ═══════════════════════════
     # TAB 1 — CHAT
-    # ═════════════════════════════
+    # ═══════════════════════════
     with tab1:
 
-        # Display chat history
+        # Chat history
         for msg in st.session_state.get(
                 "message_log", []):
             if msg["role"] == "user":
@@ -280,44 +291,12 @@ if openai_key:
                 with st.chat_message(
                         "assistant",
                         avatar="🧠"):
-                    tool = msg.get(
-                        "tool_used", "")
-                    if tool == "RAG":
-                        st.markdown(
-                            '<span class='
-                            '"routing-badge" '
-                            'style="background:'
-                            '#e3f2fd;color:'
-                            '#1565c0">'
-                            '📄 Used RAG'
-                            '</span>',
-                            unsafe_allow_html
-                            =True)
-                    elif tool == "MCP":
-                        st.markdown(
-                            '<span class='
-                            '"routing-badge" '
-                            'style="background:'
-                            '#e8f5e9;color:'
-                            '#2e7d32">'
-                            '🔧 Used MCP'
-                            '</span>',
-                            unsafe_allow_html
-                            =True)
-                    elif tool == "BOTH":
-                        st.markdown(
-                            '<span class='
-                            '"routing-badge" '
-                            'style="background:'
-                            '#fff3e0;color:'
-                            '#e65100">'
-                            '🔄 Used RAG + MCP'
-                            '</span>',
-                            unsafe_allow_html
-                            =True)
+                    show_badge(
+                        msg.get(
+                            "tool_used", ""))
                     st.write(msg["content"])
 
-        # Suggested questions
+        # Demo question buttons
         st.subheader(
             "💬 Try These Demo Questions")
         col1, col2, col3 = st.columns(3)
@@ -341,7 +320,6 @@ if openai_key:
             "whether to search your docs "
             "or use live tools!")
 
-        # Handle suggested questions
         if rag_q:
             user_input = (
                 "What are the main points "
@@ -357,7 +335,6 @@ if openai_key:
                 "and search for related "
                 "recent news online")
 
-        # Process input
         if user_input:
             with st.chat_message("user"):
                 st.write(user_input)
@@ -387,41 +364,7 @@ if openai_key:
                             st.session_state
                             .chat_history))
 
-                tool = result["tool_used"]
-                if tool == "RAG":
-                    st.markdown(
-                        '<span class='
-                        '"routing-badge" '
-                        'style="background:'
-                        '#e3f2fd;color:'
-                        '#1565c0">'
-                        '📄 Used RAG'
-                        '</span>',
-                        unsafe_allow_html
-                        =True)
-                elif tool == "MCP":
-                    st.markdown(
-                        '<span class='
-                        '"routing-badge" '
-                        'style="background:'
-                        '#e8f5e9;color:'
-                        '#2e7d32">'
-                        '🔧 Used MCP'
-                        '</span>',
-                        unsafe_allow_html
-                        =True)
-                elif tool == "BOTH":
-                    st.markdown(
-                        '<span class='
-                        '"routing-badge" '
-                        'style="background:'
-                        '#fff3e0;color:'
-                        '#e65100">'
-                        '🔄 Used RAG + MCP'
-                        '</span>',
-                        unsafe_allow_html
-                        =True)
-
+                show_badge(result["tool_used"])
                 st.write(result["answer"])
 
                 if result["rag_context"]:
@@ -438,7 +381,8 @@ if openai_key:
                             "🔧 View MCP "
                             "Tool Result"):
                         st.code(
-                            result["mcp_result"])
+                            result[
+                                "mcp_result"])
 
             st.session_state.message_log\
                 .append({
@@ -453,27 +397,25 @@ if openai_key:
                     "content": result["answer"]
                 })
 
-    # ═════════════════════════════
+    # ═══════════════════════════
     # TAB 2 — CHUNK INSPECTOR
-    # ═════════════════════════════
+    # ═══════════════════════════
     with tab2:
-        st.subheader("🔬 Document Chunk Inspector")
+        st.subheader(
+            "🔬 Document Chunk Inspector")
         st.caption(
             "See exactly how your PDF was "
-            "broken into searchable chunks. "
-            "Each chunk is what the AI "
-            "searches through!")
+            "broken into searchable chunks!")
 
         if not (
                 st.session_state.get(
                     "rag_engine")
-                and st.session_state.rag_engine
-                .has_documents()):
+                and st.session_state
+                .rag_engine.has_documents()):
             st.info(
                 "👈 Upload a PDF first to "
                 "see how it gets chunked!")
 
-            # Show explanation even without docs
             st.markdown("---")
             st.markdown(
                 "### 📖 How Chunking Works")
@@ -488,21 +430,18 @@ if openai_key:
             **Why chunk at all?**
             AI has limited input size.
             Smaller chunks = more precise
-            search. We find exact paragraphs
-            not whole pages.
+            search results.
             """)
             col2.markdown("""
             **What is chunk overlap?**
             Adjacent chunks share 200
-            characters. This prevents
-            answers from being cut in half
-            at chunk boundaries.
+            characters preventing answers
+            from being cut at boundaries.
 
             **How does search work?**
-            When you ask a question we
-            convert it to numbers and find
-            the 4 most similar chunks by
-            MEANING not just keywords.
+            AI finds the 4 most relevant
+            chunks by MEANING not keywords
+            and reads just those to answer.
             """)
 
         else:
@@ -515,73 +454,69 @@ if openai_key:
 
             if chunks and stats:
 
-                # Summary stats
+                # Stats row
                 st.markdown(
                     "### 📊 Chunk Statistics")
-                col1, col2, col3, col4 = (
-                    st.columns(4))
-
+                col1, col2, col3, col4, col5 = (
+                    st.columns(5))
                 col1.metric(
                     "📦 Total Chunks",
-                    stats["total"],
-                    help="Total number of "
-                         "chunks created")
+                    stats["total"])
                 col2.metric(
-                    "📏 Avg Chunk Size",
+                    "📏 Avg Size",
                     str(stats["avg_length"])
-                    + " chars",
-                    help="Average characters "
-                         "per chunk")
+                    + " chars")
                 col3.metric(
+                    "📝 Avg Words",
+                    str(stats["avg_words"]))
+                col4.metric(
                     "⬆️ Max Chunk",
                     str(stats["max_length"])
-                    + " chars",
-                    help="Largest chunk size")
-                col4.metric(
-                    "📄 Total Characters",
-                    str(stats["total_chars"]),
-                    help="Total text indexed")
+                    + " chars")
+                col5.metric(
+                    "📚 Total Words",
+                    str(stats["total_words"]))
 
                 st.markdown("---")
 
-                # Chunk size explanation
+                # Settings explanation
                 with st.expander(
-                        "💡 Why these settings?"):
+                        "💡 Why these "
+                        "chunk settings?"):
                     st.markdown("""
                     **Chunk Size: 1000 chars**
-                    Each chunk holds about
-                    150 words. Big enough
-                    to have context, small
-                    enough to be precise.
+                    Each chunk holds ~150 words.
+                    Big enough for context,
+                    small enough for precision.
 
                     **Chunk Overlap: 200 chars**
-                    Adjacent chunks share
-                    200 characters so answers
-                    near boundaries are never
-                    cut in half.
+                    Adjacent chunks share 200
+                    characters so no answer
+                    is ever cut in half.
 
                     **Top K Results: 4**
-                    When you ask a question
-                    the AI finds the 4 most
-                    relevant chunks and reads
-                    those to answer you.
+                    AI finds 4 most relevant
+                    chunks per question using
+                    semantic similarity search.
                     """)
 
                 st.markdown(
-                    "### 🔍 Browse All Chunks")
+                    "### 🔍 Browse Chunks")
 
-                # Search filter
+                # Filters
                 col1, col2 = st.columns([3, 1])
                 search_chunks = col1.text_input(
                     "Search within chunks:",
                     placeholder=(
-                        "Type to filter "
-                        "chunks by content..."))
+                        "Filter by content..."))
+
+                sources = list(set(
+                    c["source"]
+                    for c in chunks))
                 source_filter = col2.selectbox(
                     "Filter by file:",
-                    options=["All Files"] + list(
-                        set(c["source"]
-                            for c in chunks)))
+                    options=(
+                        ["All Files"] + sources))
 
                 # Apply filters
                 filtered = chunks
@@ -596,7 +531,6 @@ if openai_key:
                         if c["source"]
                         == source_filter]
 
-                # Show filter results
                 if search_chunks or (
                         source_filter
                         != "All Files"):
@@ -609,7 +543,6 @@ if openai_key:
 
                 st.markdown("---")
 
-                # Display chunks
                 if not filtered:
                     st.warning(
                         "No chunks match "
@@ -617,21 +550,15 @@ if openai_key:
                 else:
                     for i, chunk in enumerate(
                             filtered):
-
-                        # Chunk size color
                         size_pct = (
                             chunk["length"]
                             / 1000)
-                        if size_pct > 0.8:
-                            size_color = "#F44336"
-                        elif size_pct > 0.5:
-                            size_color = "#FF9800"
-                        else:
-                            size_color = "#4CAF50"
-
-                        chunk_num = i + 1
+                        chunk_num = (
+                            chunk["chunk_id"])
                         page_num = chunk["page"]
                         char_len = chunk["length"]
+                        word_cnt = (
+                            chunk["word_count"])
                         src = chunk["source"]
 
                         with st.expander(
@@ -642,9 +569,10 @@ if openai_key:
                                 + "  |  "
                                 + str(char_len)
                                 + " chars  |  "
-                                + str(src)):
+                                + str(word_cnt)
+                                + " words"):
 
-                            # Visual size bar
+                            # Size bar
                             st.markdown(
                                 "**Chunk Size:**")
                             st.progress(
@@ -662,14 +590,15 @@ if openai_key:
                                 "**Content:**")
                             st.text_area(
                                 label=(
-                                    "chunk_content"
+                                    "content_"
                                     + str(i)),
                                 value=(
                                     chunk[
-                                        "content"]),
+                                        "content"
+                                    ]),
                                 height=200,
                                 key=(
-                                    "chunk_ta_"
+                                    "inspect_"
                                     + str(i)),
                                 label_visibility=(
                                     "collapsed"))
@@ -678,15 +607,223 @@ if openai_key:
                             col1, col2, col3 = (
                                 st.columns(3))
                             col1.caption(
-                                "📌 Source: "
+                                "📌 "
                                 + str(src))
                             col2.caption(
-                                "📖 Page: "
+                                "📖 Page "
                                 + str(page_num))
                             col3.caption(
-                                "📏 Length: "
+                                "📏 "
                                 + str(char_len)
-                                + " chars")
+                                + " chars / "
+                                + str(word_cnt)
+                                + " words")
+
+    # ═══════════════════════════
+    # TAB 3 — CHUNK TABLE
+    # ═══════════════════════════
+    with tab3:
+        st.subheader("📋 Chunk Data Table")
+        st.caption(
+            "Full table view of all chunks "
+            "stored in the FAISS database. "
+            "Search, sort, and download!")
+
+        if not (
+                st.session_state.get(
+                    "rag_engine")
+                and st.session_state
+                .rag_engine.has_documents()):
+            st.info(
+                "👈 Upload a PDF first to "
+                "view the chunk table!")
+
+        else:
+            df = (
+                st.session_state.rag_engine
+                .get_chunks_as_dataframe())
+
+            if df.empty:
+                st.warning(
+                    "No chunks found!")
+            else:
+                # Table controls
+                col1, col2, col3 = (
+                    st.columns([3, 2, 1]))
+
+                search_table = col1.text_input(
+                    "🔍 Search table:",
+                    placeholder=(
+                        "Filter by any text..."),
+                    key="table_search")
+
+                col_filter = col2.selectbox(
+                    "📄 Filter by file:",
+                    options=(
+                        ["All Files"]
+                        + list(
+                            df["Source File"]
+                            .unique())),
+                    key="table_file_filter")
+
+                show_full = col3.checkbox(
+                    "Show full\ncontent",
+                    value=False)
+
+                # Apply filters
+                filtered_df = df.copy()
+
+                if search_table:
+                    mask = filtered_df.apply(
+                        lambda row: row.astype(
+                            str).str.contains(
+                            search_table,
+                            case=False).any(),
+                        axis=1)
+                    filtered_df = (
+                        filtered_df[mask])
+
+                if col_filter != "All Files":
+                    filtered_df = (
+                        filtered_df[
+                            filtered_df[
+                                "Source File"
+                            ] == col_filter])
+
+                # Row count
+                st.caption(
+                    "Showing "
+                    + str(len(filtered_df))
+                    + " of "
+                    + str(len(df))
+                    + " total chunks")
+
+                # Choose columns to display
+                if show_full:
+                    display_df = filtered_df
+                else:
+                    display_df = filtered_df[
+                        ["Chunk #",
+                         "Source File",
+                         "Page",
+                         "Words",
+                         "Characters",
+                         "Preview"]]
+
+                # Display interactive table
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    height=450,
+                    column_config={
+                        "Chunk #": (
+                            st.column_config
+                            .NumberColumn(
+                                "Chunk #",
+                                width="small")),
+                        "Source File": (
+                            st.column_config
+                            .TextColumn(
+                                "Source File",
+                                width="medium")),
+                        "Page": (
+                            st.column_config
+                            .NumberColumn(
+                                "Page",
+                                width="small")),
+                        "Words": (
+                            st.column_config
+                            .NumberColumn(
+                                "Words",
+                                width="small")),
+                        "Characters": (
+                            st.column_config
+                            .ProgressColumn(
+                                "Characters",
+                                min_value=0,
+                                max_value=1000,
+                                width="medium")),
+                        "Preview": (
+                            st.column_config
+                            .TextColumn(
+                                "Content Preview",
+                                width="large")),
+                        "Full Content": (
+                            st.column_config
+                            .TextColumn(
+                                "Full Content",
+                                width="large")),
+                    })
+
+                st.markdown("---")
+
+                # Download options
+                st.markdown(
+                    "### ⬇️ Download Options")
+                col1, col2 = st.columns(2)
+
+                # CSV download
+                csv_data = (
+                    filtered_df.to_csv(
+                        index=False))
+                col1.download_button(
+                    label=(
+                        "📥 Download as CSV"),
+                    data=csv_data,
+                    file_name=(
+                        "chunks_export.csv"),
+                    mime="text/csv",
+                    use_container_width=True)
+
+                # Full text download
+                full_text = "\n\n".join([
+                    "=== CHUNK "
+                    + str(row["Chunk #"])
+                    + " | Page "
+                    + str(row["Page"])
+                    + " | "
+                    + str(row["Source File"])
+                    + " ===\n"
+                    + str(row["Full Content"])
+                    for _, row in
+                    filtered_df.iterrows()
+                ])
+                col2.download_button(
+                    label=(
+                        "📥 Download Full "
+                        "Text"),
+                    data=full_text,
+                    file_name=(
+                        "chunks_full_text.txt"),
+                    mime="text/plain",
+                    use_container_width=True)
+
+                # Summary stats below table
+                st.markdown("---")
+                st.markdown(
+                    "### 📊 Table Summary")
+                col1, col2, col3, col4 = (
+                    st.columns(4))
+
+                col1.metric(
+                    "Rows Shown",
+                    len(filtered_df))
+                col2.metric(
+                    "Avg Words/Chunk",
+                    str(int(
+                        filtered_df["Words"]
+                        .mean())))
+                col3.metric(
+                    "Avg Chars/Chunk",
+                    str(int(
+                        filtered_df[
+                            "Characters"]
+                        .mean())))
+                col4.metric(
+                    "Total Words",
+                    str(int(
+                        filtered_df["Words"]
+                        .sum())))
 
 else:
     st.warning(
