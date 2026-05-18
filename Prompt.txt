@@ -1,0 +1,150 @@
+I want to build a Python + Streamlit AI assistant application that combines RAG (Retrieval Augmented Generation) and MCP (Model Context Protocol) with smart automatic routing. Here are the full requirements:
+
+## WHAT THE APP DOES
+- User uploads one or more PDF documents via a sidebar file uploader
+- User types questions in a chat interface
+- The app automatically decides whether to:
+  (a) Search the uploaded documents using RAG → shows a BLUE badge
+  (b) Call live external tools using MCP → shows a GREEN badge
+  (c) Use both sources combined → shows an ORANGE badge
+- The routing decision is made automatically — the user never manually selects a mode
+
+## TECH STACK (use exactly these)
+- Frontend: Streamlit
+- AI Model: OpenAI GPT-4o (via openai Python library)
+- RAG Framework: LangChain 0.2.16
+- Vector Database: FAISS (faiss-cpu) — NOT ChromaDB
+- PDF Reading: pypdf — NOT PyMuPDF (causes Streamlit Cloud build errors)
+- Web Search: duckduckgo-search library (free, no API key)
+- Weather: requests to https://wttr.in/{city}?format=3 (free, no API key)
+- Encyclopedia: wikipedia Python library (free, no API key)
+- Deployment: Streamlit Cloud (from GitHub)
+
+## FILE STRUCTURE
+Create exactly 4 Python files:
+1. app.py         — Streamlit UI, 3 tabs, session state, badge display
+2. router.py      — Smart routing logic, keyword detection, OpenAI calls
+3. rag_engine.py  — RAGEngine class, PDF loading, FAISS, chunk visualization
+4. mcp_tools.py   — Tool functions + TOOLS list for GPT-4o tool calling
+
+Also create: requirements.txt, .env (template), .gitignore
+
+## ROUTING LOGIC (router.py)
+The router scans each question for keywords:
+
+doc_keywords = ["document", "pdf", "file", "uploaded", "what does it say",
+                "according to", "from the", "guide", "manual"]
+
+live_keywords = ["weather", "news", "today", "latest", "now",
+                 "right now", "this week", "current", "search"]
+
+both_keywords = [" and find ", " and search ", " plus find ",
+                 " as well as ", " also find "]
+
+Decision logic:
+- is_doc = any(kw in query.lower() for kw in doc_keywords)
+- is_live = any(kw in query.lower() for kw in live_keywords)
+- Only search FAISS if is_doc is True — never search FAISS for weather questions
+- Only pass TOOLS to GPT-4o if is_live is True or no doc context found
+- tool_used = "BOTH" if (is_doc and tool_was_called) else "RAG" if is_doc else "MCP"
+
+## RAG ENGINE (rag_engine.py)
+Class RAGEngine with these methods:
+- __init__(openai_key): sets up OpenAIEmbeddings, vectorstore=None, all_chunks=[]
+- load_pdf(uploaded_file): PyPDFLoader → RecursiveCharacterTextSplitter(
+    chunk_size=1000, chunk_overlap=200) → FAISS.from_documents()
+  Also append every chunk to self.all_chunks as:
+  {"chunk_id": n, "content": text, "page": page_num, "source": filename,
+   "length": len(text), "word_count": len(text.split())}
+- search(query, k=4): vectorstore.similarity_search(query, k=4)
+  Return formatted string with [Page X — filename] citations
+- get_chunks_for_display(): return self.all_chunks
+- get_chunks_as_dataframe(): return pandas DataFrame with columns:
+  Chunk #, Source File, Page, Words, Characters, Preview, Full Content
+- get_chunk_stats(): return dict with total, avg_length, max_length, total_words
+- has_documents(): return self.vectorstore is not None
+
+## MCP TOOLS (mcp_tools.py)
+Create these 5 tool functions (all free, no API keys needed):
+1. web_search(query): use DDGS().text(query, max_results=5) from duckduckgo_search
+2. get_weather(city): GET https://wttr.in/{city}?format=3 via requests
+3. wikipedia_search(topic): use wikipedia.summary(topic, sentences=5)
+   Handle DisambiguationError and PageError gracefully
+4. news_search(query): use DDGS().news(query, max_results=5)
+5. get_datetime(): return str(datetime.now())
+
+Also create a TOOLS list in OpenAI tool-calling format with name,
+description, and parameters for each function.
+Create execute_tool(tool_name, tool_args) that dispatches to the right function.
+
+## STREAMLIT UI (app.py)
+Sidebar:
+- OpenAI API key input (password type), reads from .env first
+- PDF file uploader (accept_multiple_files=True)
+- System status section (RAG loaded / MCP ready)
+- Chunk statistics (total chunks, avg size, total words)
+- Clear conversation button
+
+Initialize in session_state (only once):
+- rag_engine = RAGEngine(openai_key)
+- router = SmartRouter(openai_key, rag_engine)
+- chat_history = []
+- message_log = []
+
+Create 3 tabs: tab1, tab2, tab3 = st.tabs(["💬 Chat Assistant",
+                                             "🔬 Chunk Inspector",
+                                             "📋 Chunk Table"])
+
+Tab 1 — Chat:
+- Display previous messages with stored badges
+- show_badge(tool_used) helper that renders colored HTML badge
+- 3 quick-question buttons for demo purposes
+- st.chat_input() for user messages
+- On submit: call router.route_and_respond(query, chat_history)
+- Display badge + answer + expandable RAG sources + MCP tool result
+- Store badge label in message_log for re-rendering
+
+Tab 2 — Chunk Inspector:
+- 5 metric cards: Total Chunks, Avg Size, Avg Words, Max Chunk, Total Words
+- Text search input that filters self.all_chunks using list comprehension
+- File dropdown filter
+- For each chunk: st.expander() with progress bar (size/1000),
+  text_area with full content, metadata row (page, source, length)
+
+Tab 3 — Chunk Table:
+- Get pandas DataFrame from rag_engine.get_chunks_as_dataframe()
+- Search box filters all columns: df[mask] where mask = row.astype(str).str.contains()
+- File dropdown filter
+- st.dataframe() with column_config: ProgressColumn for Characters column
+- Two download buttons: CSV (df.to_csv()) and full text
+- Summary stats below: rows shown, avg words, avg chars, total words
+
+## CHUNK BADGE COLORS
+- RAG: background #e3f2fd, color #1565c0, text "📄 Used RAG"
+- MCP: background #e8f5e9, color #2e7d32, text "🔧 Used MCP"
+- BOTH: background #fff3e0, color #e65100, text "🔄 Used RAG + MCP"
+
+## requirements.txt
+streamlit
+openai
+langchain==0.2.16
+langchain-openai==0.1.23
+langchain-community==0.2.16
+langchain-text-splitters==0.2.4
+langchain-core==0.2.38
+faiss-cpu
+pypdf
+python-dotenv
+requests
+duckduckgo-search
+wikipedia
+pandas
+
+## DEPLOYMENT
+- .gitignore must include: .env, __pycache__/, *.pyc
+- .env template: OPENAI_API_KEY=your-key-here
+- App deploys to Streamlit Cloud from GitHub master branch
+- OpenAI API key stored in Streamlit Cloud Secrets
+
+Please generate all 4 Python files + requirements.txt + .gitignore + .env template.
+Make sure the app runs with: streamlit run app.py
